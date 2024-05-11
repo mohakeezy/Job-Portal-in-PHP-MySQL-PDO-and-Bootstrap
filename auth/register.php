@@ -3,6 +3,7 @@
 <?php require "../includes/header.php"; ?>
 
 <?php 
+ob_start(); // Start output buffering at the top
 
   if(isset($_SESSION['username'])) {
         
@@ -12,16 +13,17 @@
 
   if(isset($_POST['submit'])) {
 
-    if(empty($_POST['username']) OR empty($_POST['email']) OR empty($_POST['password']) OR empty($_POST['re-password'])) {
+    if(empty($_POST['fullname']) OR empty($_POST['username']) OR empty($_POST['email']) OR empty($_POST['password']) OR empty($_POST['re-password'])) {
       echo "<script>alert('some inputs are empty')</script>";
     } else {
 
+      $fullname = $_POST['fullname'];
       $username = $_POST['username'];
       $email = $_POST['email'];
       $password = $_POST['password'];
       $repassword = $_POST['re-password'];
-      $img = 'web-coding.png';
-      $type= $_POST['type'];
+      $img = 'm.png';
+      $type= 'User';
 
       //checking for password match
       if($password == $repassword) {
@@ -43,18 +45,20 @@
 
           } else {
 
-            $insert = $conn->prepare("INSERT INTO users (username, email, mypassword, img, type) 
-            VALUES (:username, :email, :mypassword, :img, :type)");
+            $insert = $conn->prepare("INSERT INTO users (fullname,username, email, mypassword, img, type) 
+            VALUES (:fullname, :username, :email, :mypassword, :img, :type)");
   
             $insert->execute([
+              ':fullname' =>  $fullname,
               ':username' =>  $username,
               ':email' =>  $email,
-              ':mypassword' =>  password_hash($password, PASSWORD_DEFAULT),
+               ':mypassword' =>  password_hash($password, PASSWORD_DEFAULT),
               ':img' =>  $img,
               ':type' =>  $type,
             ]);  
   
-            header("location: login.php");
+             echo "<script>alert('User Added Successfully..'); window.location.href = 'login.php';</script>";
+           exit;
           }
           
          
@@ -71,7 +75,7 @@
 
     }
   }
-
+ob_end_flush(); // Send the output buffer and turn off output buffering
 
 ?>
     <!-- HOME -->
@@ -97,6 +101,12 @@
 
               <div class="row form-group">
                 <div class="col-md-12 mb-3 mb-md-0">
+                  <label class="text-black" for="fname">fullname</label>
+                  <input type="text" id="fname" class="form-control" placeholder="fullname" name="fullname">
+                </div>
+              </div>
+              <div class="row form-group">
+                <div class="col-md-12 mb-3 mb-md-0">
                   <label class="text-black" for="fname">Username</label>
                   <input type="text" id="fname" class="form-control" placeholder="Username" name="username">
                 </div>
@@ -108,13 +118,13 @@
                 </div>
               </div>
 
-              <div class="form-group">
+             <!--  <div class="form-group">
                 <label for="job-type">User Type</label>
                 <select name="type" class="selectpicker border rounded" id="user-type" data-style="btn-black" data-width="100%" data-live-search="true" title="Select User Type">
                   <option>Worker</option>
                   <option>Company</option>
                 </select>
-              </div>
+              </div> -->
               <div class="row form-group">
                 <div class="col-md-12 mb-3 mb-md-0">
                   <label class="text-black" for="fname">Password</label>

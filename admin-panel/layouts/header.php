@@ -3,7 +3,7 @@
 
   session_start();
 
-  define("ADMINURL", "http://localhost/jobboard/admin-panel");
+  define("ADMINURL", "http://localhost/LAM/admin-panel");
 
 ?>
 <!DOCTYPE html>

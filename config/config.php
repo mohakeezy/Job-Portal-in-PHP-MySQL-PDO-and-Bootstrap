@@ -5,7 +5,7 @@
         
         $host = "localhost";
 
-        $dbname = "jobboard";
+        $dbname = "LAM";
     
         $user = "root";
     

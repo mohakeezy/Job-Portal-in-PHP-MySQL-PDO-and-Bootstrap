@@ -44,6 +44,7 @@
 
                 } else {
                     echo "<script>alert('invalid user')</script>";
+                    header("location: ".ADMINURL."");
 
                 }
             } else {

@@ -1,20 +1,70 @@
-<?php require "includes/header.php"; ?>
-<?php require "config/config.php"; ?>
-<?php 
+<?php
+require 'config/config.php'; // Database connection
+require "includes/header.php";
+  try {
+    // Fetch all active arts in random order
+    $sql = "SELECT arts.art_id, arts.title, arts.description, arts.image, arts.created_at, arts.updated_at, arts.status, users.fullname as artist_name FROM arts JOIN users ON arts.artist_id = users.id WHERE arts.status = 1 ORDER BY RAND()";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $arts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-  $select = $conn->query("SELECT * FROM jobs  WHERE status = 1 ORDER BY created_at DESC LIMIT 5");
+    // Fetch the latest 4 posts ordered by creation date descending
+    $sql_latest = "SELECT arts.art_id, arts.title, arts.description, arts.image, arts.created_at, users.fullname as artist_name FROM arts JOIN users ON arts.artist_id = users.id WHERE arts.status = 1 ORDER BY arts.created_at DESC LIMIT 3";
+    $stmt_latest = $conn->prepare($sql_latest);
+    $stmt_latest->execute();
+    $latest_arts = $stmt_latest->fetchAll(PDO::FETCH_ASSOC);
+  } catch (PDOException $e) {
+      echo "Error: " . $e->getMessage();
+  }
 
-  $select->execute();
+  try {
+    $sql_count = "SELECT COUNT(*) as total_arts FROM arts WHERE status = 1";
+    $stmt_count = $conn->prepare($sql_count);
+    $stmt_count->execute();
+    $result = $stmt_count->fetch(PDO::FETCH_ASSOC);
+    $total_arts = $result['total_arts'];
+    $usersCount = $conn->query("SELECT COUNT(*) FROM users WHERE type = 'User'")->fetchColumn();
 
-  $jobs = $select->fetchAll(PDO::FETCH_OBJ);
+// Tirooyinka farshaxanka (arts)
+$artsCount = $conn->query("SELECT COUNT(*) FROM arts")->fetchColumn();
 
-  $searches = $conn->query("SELECT COUNT(keyword) AS count, keyword FROM searches
-   GROUP BY keyword ORDER BY count DESC LIMIT 4");
+// Tirooyinka fanaaniinta (artists)
+$artistsCount = $conn->query("SELECT COUNT(*) FROM users WHERE type = 'artist'")->fetchColumn();
 
-  $searches->execute();
+  } catch (PDOException $e) {
+    echo "Error: " . $e->getMessage();
+    $total_arts = 0; // default to 0 in case of an error
+  }
+  try {
 
-  $allSearches = $searches->fetchAll(PDO::FETCH_OBJ);
+    $sql = "SELECT * FROM categories"; // Adjust if your table or columns differ
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
 
+    // Set the resulting array to associative
+    $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
+    echo "Connection failed: " . $e->getMessage();
+    $categories = []; // Define as an empty array in case of database connection failure
+}
+
+
+try {
+    $sql = "SELECT arts.art_id, arts.title, arts.description, arts.image, arts.created_at, arts.status, users.fullname as artist_name,
+            EXISTS (SELECT 1 FROM favorites WHERE favorites.art_id = arts.art_id AND favorites.user_id = :user_id) AS is_favorited
+            FROM arts
+            JOIN users ON arts.artist_id = users.id
+            WHERE arts.status = 1
+            ORDER BY RAND()";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':user_id', $userId);
+    $stmt->execute();
+    $arts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    echo "Error: " . $e->getMessage();
+    exit;
+}
 
 ?>
     <!-- HOME -->
@@ -24,48 +74,31 @@
         <div class="row align-items-center justify-content-center">
           <div class="col-md-12">
             <div class="mb-5 text-center">
-              <h1 class="text-white font-weight-bold">The Easiest Way To Get Your Dream Job</h1>
+              <h1 class="text-white font-weight-bold">The Easiest Way To Get Your Art</h1>
               <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Cupiditate est, consequuntur perferendis.</p>
             </div>
-            <form method="post" action="search.php" class="search-jobs-form">
-              <div class="row mb-5">
-                <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-4 mb-lg-0">
-                  <input name="job-title" type="text" class="form-control form-control-lg" placeholder="Job title">
-                </div>
-                <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-4 mb-lg-0">
-                  <select name="job-region" class="selectpicker" data-style="btn-white btn-lg" data-width="100%" data-live-search="true" title="Select Region">
-                    <option>Anywhere</option>
-                    <option>San Francisco</option>
-                    <option>Palo Alto</option>
-                    <option>New York</option>
-                    <option>Manhattan</option>
-                    <option>Ontario</option>
-                    <option>Toronto</option>
-                    <option>Kansas</option>
-                    <option>Mountain View</option>
-                  </select>
-                </div>
-                <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-4 mb-lg-0">
-                  <select name="job-type" class="selectpicker" data-style="btn-white btn-lg" data-width="100%" data-live-search="true" title="Select Job Type">
-                    <option>Part Time</option>
-                    <option>Full Time</option>
-                  </select>
-                </div>
-                <div class="col-12 col-sm-6 col-md-6 col-lg-3 mb-4 mb-lg-0">
-                  <button type="submit" name="submit" class="btn btn-primary btn-lg btn-block text-white btn-search"><span class="icon-search icon mr-2"></span>Search Job</button>
-                </div>
-              </div>
-              <div class="row">
-                <div class="col-md-12 popular-keywords">
-                  <h3>Trending Keywords:</h3>
-                  <ul class="keywords list-unstyled m-0 p-0">
-                    <?php foreach($allSearches as $search) : ?>
-                      <li><a href="#" class=""><?php echo $search->keyword; ?></a></li>
-                    <?php endforeach; ?>
-                  </ul>
-                </div>
-              </div>
-            </form>
+            <form method="post" action="search.php" class="search-jobs-form" onsubmit="performSearch(event)">
+    <div class="row mb-5">
+        <div class="col-12 col-sm-6 col-md-6 col-lg-8 mb-4 mb-lg-0">
+            <input name="art-title" type="text" class="form-control form-control-lg" placeholder="Art title" id="searchInput">
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-6 col-lg-4 mb-4 mb-lg-0">
+            <button type="submit" class="btn btn-primary btn-lg btn-block text-white btn-search"><span class="icon-search icon mr-2"></span>Search Art</button>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12 popular-keywords">
+            <h3>Trending Keywords:</h3>
+            <ul class="keywords list-unstyled m-0 p-0">
+                <li><a href="#" class="">1</a></li>
+                <li><a href="#" class="">2</a></li>
+                <li><a href="#" class="">3</a></li>
+            </ul>
+        </div>
+    </div>
+</form>
+
           </div>
         </div>
       </div>
@@ -75,208 +108,137 @@
       </a>
 
     </section>
-    
-    <section class="py-5 bg-image overlay-primary fixed overlay" id="next" style="background-image: url('images/hero_1.jpg');">
-      <div class="container">
-        <div class="row mb-5 justify-content-center">
-          <div class="col-md-7 text-center">
-            <h2 class="section-title mb-2 text-white">JobBoard Site Stats</h2>
-            <p class="lead text-white">Lorem ipsum dolor sit amet consectetur adipisicing elit. Expedita unde officiis recusandae sequi excepturi corrupti.</p>
-          </div>
-        </div>
-        <div class="row pb-0 block__19738 section-counter">
 
-          <div class="col-6 col-md-6 col-lg-3 mb-5 mb-lg-0">
-            <div class="d-flex align-items-center justify-content-center mb-2">
-              <strong class="number" data-number="1930">0</strong>
-            </div>
-            <span class="caption">Candidates</span>
-          </div>
-
-          <div class="col-6 col-md-6 col-lg-3 mb-5 mb-lg-0">
-            <div class="d-flex align-items-center justify-content-center mb-2">
-              <strong class="number" data-number="54">0</strong>
-            </div>
-            <span class="caption">Jobs Posted</span>
-          </div>
-
-          <div class="col-6 col-md-6 col-lg-3 mb-5 mb-lg-0">
-            <div class="d-flex align-items-center justify-content-center mb-2">
-              <strong class="number" data-number="120">0</strong>
-            </div>
-            <span class="caption">Jobs Filled</span>
-          </div>
-
-          <div class="col-6 col-md-6 col-lg-3 mb-5 mb-lg-0">
-            <div class="d-flex align-items-center justify-content-center mb-2">
-              <strong class="number" data-number="550">0</strong>
-            </div>
-            <span class="caption">Companies</span>
-          </div>
-
-            
-        </div>
-      </div>
-    </section>
-
-    
-
-    <section class="site-section">
-      <div class="container">
-
-        <!-- <div class="row mb-5 justify-content-center">
-          <div class="col-md-7 text-center">
-            <h2 class="section-title mb-2">43,167 Job Listed</h2>
-          </div>
-        </div> -->
-        
-        <ul class="job-listings mb-5">
-          <?php foreach($jobs as $job) : ?>
-            <li class="job-listing d-block d-sm-flex pb-3 pb-sm-0 align-items-center">
-              <a href="jobs/job-single.php?id=<?php echo $job->id; ?>"></a>
-              <div class="job-listing-logo">
-                <img src="users/user-images/<?php echo $job->company_image; ?>" alt="<?php echo $job->company_image; ?>" class="img-fluid">
-              </div>
-
-              <div class="job-listing-about d-sm-flex custom-width w-100 justify-content-between mx-4">
-                <div class="job-listing-position custom-width w-50 mb-3 mb-sm-0">
-                  <h2><?php echo $job->job_title; ?></h2>
-                  <strong><?php echo $job->company_name; ?></strong>
-                </div>
-                <div class="job-listing-location mb-3 mb-sm-0 custom-width w-25">
-                  <span class="icon-room"></span> <?php echo $job->job_region; ?>
-                </div>
-                <div class="job-listing-meta">
-                <span class="badge badge-<?php if($job->job_type == 'Part Time') { echo 'danger'; } else { echo 'success'; } ?>"><?php echo $job->job_type; ?></span>
-                </div>
-              </div>
-              
-            </li>
-            <br>
-          <?php endforeach; ?>
-        
-
-          
-
-          
-        </ul>
-
-     
-
-      </div>
-    </section>
-
-    <section class="py-5 bg-image overlay-primary fixed overlay" style="background-image: url('images/hero_1.jpg');">
-      <div class="container">
-        <div class="row align-items-center">
-          <div class="col-md-8">
-            <h2 class="text-white">Looking For A Job?</h2>
-            <p class="mb-0 text-white lead">Lorem ipsum dolor sit amet consectetur adipisicing elit tempora adipisci impedit.</p>
-          </div>
-          <div class="col-md-3 ml-auto">
-            <a href="#" class="btn btn-warning btn-block btn-lg">Sign Up</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    
-    <section class="site-section py-4">
-      <div class="container">
   
-        <div class="row align-items-center">
-          <div class="col-12 text-center mt-4 mb-5">
-            <div class="row justify-content-center">
-              <div class="col-md-7">
-                <h2 class="section-title mb-2">Company We've Helped</h2>
-                <p class="lead">Porro error reiciendis commodi beatae omnis similique voluptate rerum ipsam fugit mollitia ipsum facilis expedita tempora suscipit iste</p>
-              </div>
-            </div>
-            
-          </div>
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_mailchimp.svg" alt="Image" class="img-fluid logo-1">
-          </div>
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_paypal.svg" alt="Image" class="img-fluid logo-2">
-          </div>
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_stripe.svg" alt="Image" class="img-fluid logo-3">
-          </div>
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_visa.svg" alt="Image" class="img-fluid logo-4">
-          </div>
+    
+  <section class="py-5 bg-image overlay-primary fixed overlay" id="next" style="background-image: url('images/hero_1.jpg');">
+  <div class="container">
+    <div class="row mb-5 justify-content-center">
+      <div class="col-md-7 text-center">
+        <h2 class="section-title mb-2 text-white">Local artisan marketplace</h2>
+        <p class="lead text-white">Lorem ipsum dolor sit amet consectetur adipisicing elit. Expedita unde officiis recusandae sequi excepturi corrupti.</p>
+      </div>
+    </div>
+    <div class="row pb-0 block__19738 section-counter">
 
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_apple.svg" alt="Image" class="img-fluid logo-5">
-          </div>
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_tinder.svg" alt="Image" class="img-fluid logo-6">
-          </div>
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_sony.svg" alt="Image" class="img-fluid logo-7">
-          </div>
-          <div class="col-6 col-lg-3 col-md-6 text-center">
-            <img src="images/logo_airbnb.svg" alt="Image" class="img-fluid logo-8">
-          </div>
+      <div class="col-6 col-md-6 col-lg-4 mb-5 mb-lg-0">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <strong class="number" data-number="<?php echo $usersCount; ?>">0</strong>
         </div>
-      </div>
-    </section>
-
-
-    <section class="bg-light pt-5 testimony-full">
-        
-        <div class="owl-carousel single-carousel">
-
-        
-          <div class="container">
-            <div class="row">
-              <div class="col-lg-6 align-self-center text-center text-lg-left">
-                <blockquote>
-                  <p>&ldquo;Soluta quasi cum delectus eum facilis recusandae nesciunt molestias accusantium libero dolores repellat id in dolorem laborum ad modi qui at quas dolorum voluptatem voluptatum repudiandae.&rdquo;</p>
-                  <p><cite> &mdash; Corey Woods, @Dribbble</cite></p>
-                </blockquote>
-              </div>
-              <div class="col-lg-6 align-self-end text-center text-lg-right">
-                <img src="images/person_transparent_2.png" alt="Image" class="img-fluid mb-0">
-              </div>
-            </div>
-          </div>
-
-          <div class="container">
-            <div class="row">
-              <div class="col-lg-6 align-self-center text-center text-lg-left">
-                <blockquote>
-                  <p>&ldquo;Soluta quasi cum delectus eum facilis recusandae nesciunt molestias accusantium libero dolores repellat id in dolorem laborum ad modi qui at quas dolorum voluptatem voluptatum repudiandae.&rdquo;</p>
-                  <p><cite> &mdash; Chris Peters, @Google</cite></p>
-                </blockquote>
-              </div>
-              <div class="col-lg-6 align-self-end text-center text-lg-right">
-                <img src="images/person_transparent.png" alt="Image" class="img-fluid mb-0">
-              </div>
-            </div>
-          </div>
-
+        <span class="caption">Users</span>
       </div>
 
-    </section>
+      <div class="col-6 col-md-6 col-lg-4 mb-5 mb-lg-0">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <strong class="number" data-number="<?php echo htmlspecialchars($total_arts); ?>"><?php echo htmlspecialchars($total_arts); ?></strong>
+        </div>
+        <span class="caption">Art Posted</span>
+      </div>
 
-    <section class="pt-5 bg-image overlay-primary fixed overlay" style="background-image: url('images/hero_1.jpg');">
-      <div class="container">
+      <div class="col-6 col-md-6 col-lg-4 mb-5 mb-lg-0">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <strong class="number" data-number="<?php echo $artistsCount; ?>">0</strong>
+        </div>
+        <span class="caption">Artists</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="site-section">
+  <div class="container">
+  <h2 class="section-title text-center">Categories</h2>
+  <div class="row">
+   <!-- Dynamic category listing -->
+<?php foreach ($categories as $category): ?>
+  <div class="col-md-4">
+    <div class="card">
+      <?php if (!empty($category['image']) && file_exists("UploadCategories/" . $category['image'])): ?>
+        <!-- Display image if it exists -->
+        <a href="categories/explore_category.php?category_id=<?php echo $category['category_id']; ?>">
+        <img src="UploadCategories/<?php echo htmlspecialchars($category['image']); ?>" class="card-img-top" alt="Image for <?php echo htmlspecialchars($category['name']); ?>">
+      <?php else: ?>
+        <!-- Default image placeholder if no image exists -->
+        <img src="path/to/default/image.jpg" class="card-img-top" alt="Default Image">
+      <?php endif; ?>
+      <div class="card-body">
+        <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
+        <p class="card-text"><?php echo htmlspecialchars($category['description']); ?></p>
+      </div>
+    </a>
+    </div>
+  </div>
+<?php endforeach; ?>
+  </div>
+</div>
+</section>
+
+
+    <!-- New Section for Latest Posts -->
+<section class="latest-posts-section">
+    <div class="container">
+        <h2 class="section-title text-center">Latest Art Posts</h2>
         <div class="row">
-          <div class="col-md-6 align-self-center text-center text-md-left mb-5 mb-md-0">
-            <h2 class="text-white">Get The Mobile Apps</h2>
-            <p class="mb-5 lead text-white">Lorem ipsum dolor sit amet consectetur adipisicing elit tempora adipisci impedit.</p>
-            <p class="mb-0">
-              <a href="#" class="btn btn-dark btn-md px-4 border-width-2"><span class="icon-apple mr-3"></span>App Store</a>
-              <a href="#" class="btn btn-dark btn-md px-4 border-width-2"><span class="icon-android mr-3"></span>Play Store</a>
-            </p>
-          </div>
-          <div class="col-md-6 ml-auto align-self-end">
-            <img src="images/apps.png" alt="Free Website Template by Free-Template.co" class="img-fluid">
-          </div>
+            <?php foreach ($latest_arts as $art): ?>
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                  
+                    <img src="images/<?php echo htmlspecialchars($art['image']); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($art['title']); ?>">
+                    <div class="card-body">
+                        <h5 class="card-title"><?php echo htmlspecialchars($art['title']); ?></h5>
+                        <p class="card-text"><?php echo htmlspecialchars(substr($art['description'], 0, 100)) . '...'; ?></p>
+                        <small class="text-muted">Posted by <?php echo htmlspecialchars($art['artist_name']); ?> on <?php echo date('F j, Y', strtotime($art['created_at'])); ?></small>
+                        <div class="mt-2 d-flex justify-content-between align-items-center">
+                            <a href="arts/art_details.php?art_id=<?php echo $art['art_id']; ?>" class="btn btn-primary">View More</a>
+                             <a href="Favourite/favourite_art.php?art_id=<?php echo $art['art_id']; ?>" class="btn btn-warning">Favorite</a>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <?php endforeach; ?>
         </div>
-      </div>
-    </section>
+    </div>
+</section>
+
+
+    
+<section class="site-section">
+  <div class="container">
+    <h2 class="section-title text-center">All Arts</h2>
+    <div class="row">
+        <?php foreach ($arts as $art): ?>
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <img src="images/<?php echo htmlspecialchars($art['image']); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($art['title']); ?>">
+                <div class="card-body">
+                    <h5 class="card-title"><?php echo htmlspecialchars($art['title']); ?></h5>
+                    <p class="card-text"><?php echo htmlspecialchars(substr($art['description'], 0, 100)) . '...'; ?></p>
+                    <small class="text-muted">Posted by <?php echo htmlspecialchars($art['artist_name']); ?> on <?php echo date('F j, Y', strtotime($art['created_at'])); ?></small>
+                    <div class="mt-2 d-flex justify-content-between align-items-center">
+                        <a href="arts/art_details.php?art_id=<?php echo $art['art_id']; ?>" class="btn btn-primary">View More</a>
+                        <?php if (!$art['is_favorited']): ?>
+                            <a href="Favourite/favourite_art.php?art_id=<?php echo $art['art_id']; ?>" class="btn btn-warning">Favorite</a>
+                        <?php else: ?>
+                            <button class="btn btn-secondary" disabled>Already Favorite</button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+</section>
+
+
+
+
+
+
+
+   
     
 <?php require "includes/footer.php"; ?>
+

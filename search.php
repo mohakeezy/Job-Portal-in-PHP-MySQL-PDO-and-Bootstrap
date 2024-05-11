@@ -1,93 +1,86 @@
 <?php require "includes/header.php"; ?>
 <?php require "config/config.php"; ?>
 
-<?php 
+<?php
+$arts = [];
+$searchTerm = ""; // Initialize search term variable
 
-    if(isset($_POST['submit'])) {
-        // echo "submitted";
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['art-title'])) {
+    $searchTerm = htmlspecialchars($_POST['art-title']); // Sanitize the input
 
-        if(empty($_POST['job-title']) OR empty($_POST['job-region']) OR empty($_POST['job-type'])) {
-            header("location: ".APPURL."");
-        } else {
-
-
-            $job_title =  $_POST['job-title'];
-            $job_region =  $_POST['job-region'];
-            $job_type =  $_POST['job-type'];
-
-            //doind trending keywords
-            $insert = $conn->prepare("INSERT INTO searches (keyword) VALUES(:keyword)");
-            $insert->execute([
-                ':keyword' => $job_title
-            ]);
-
-
-            $search = $conn->query("SELECT * FROM jobs WHERE job_title LIKE '%$job_title%' AND job_region LIKE
-            '%$job_region%' AND job_type LIKE '%$job_type%' AND status = 1");
-
-            $search->execute();
-
-            $searchRes = $search->fetchAll(PDO::FETCH_OBJ);
-            // echo "<pr>";
-            // print_r($searchRes);
-            // echo "</pr>";
-            
-
-
-        }
-    } else {
-        header("location: ".APPURL."");
+    if($searchTerm==""){
+        echo "<script>alert('rt');</script>";
     }
 
-
+    try {
+        $sql = "SELECT arts.art_id, arts.title, arts.description, arts.image, arts.created_at, users.fullname as artist_name FROM arts JOIN users ON arts.artist_id = users.id WHERE arts.title LIKE ? AND arts.status = 1 ORDER BY arts.created_at DESC";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindValue(1, "%" . $searchTerm . "%");
+        $stmt->execute();
+        $arts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        echo "Error: " . $e->getMessage();
+    }
+}
 ?>
-<section class="section-hero overlay inner-page bg-image" style="background-image: url('<?php echo APPURL; ?>/images/hero_1.jpg');" id="home-section">
-      <div class="container">
+<section class="section-hero overlay inner-page bg-image" style="background-image: url('images/hero_1.jpg');" id="home-section">
+    <div class="container">
         <div class="row">
-          <div class="col-md-7">
-            <h1 class="text-white font-weight-bold">Search results for </h1>
-            <div class="custom-breadcrumbs">
-              <a href="<?php echo APPURL; ?>">Home</a> <span class="mx-2 slash">/</span>
-              <span class="text-white"><strong>Search</strong></span>
+            <div class="col-md-7">
+                <h1 class="text-white font-weight-bold">Search</h1>
+                <div class="custom-breadcrumbs">
+                    <a href="<?php echo APPURL; ?>">Home</a> <span class="mx-2 slash">/</span>
+                    <a href="#">Search</a> <span class="mx-2 slash">/</span>
+                    <span class="text-white"><strong><?php echo $searchTerm; ?></strong></span>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
+    </div>
 </section>
-
+<div class="container">
+    <h2 class="section-title text-center">Search Results for '<?php echo $searchTerm; ?>' (found)</h2>
+    <div class="row">
+        <?php if (count($arts) > 0): ?>
+            <?php foreach ($arts as $art): ?>
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <img src="images/<?php echo htmlspecialchars($art['image']); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($art['title']); ?>">
+                    <div class="card-body">
+                        <h5 class="card-title"><?php echo htmlspecialchars($art['title']); ?></h5>
+                        <p class="card-text"><?php echo htmlspecialchars(substr($art['description'], 0, 100)) . '...'; ?></p>
+                        <small class="text-muted">Posted by <?php echo htmlspecialchars($art['artist_name']); ?> on <?php echo date('F j, Y', strtotime($art['created_at'])); ?></small>
+                        <div><a href="art_details.php?art_id=<?php echo $art['art_id']; ?>" class="btn btn-primary">View More</a></div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p>No results found for '<?php echo $searchTerm; ?>'. Please try a different search term.</p>
+        <?php endif; ?>
+    </div>
+</div>
 <section class="site-section">
-      <div class="container">
-      
-        
-        <ul class="job-listings mb-5">
-            <?php if(count($searchRes) > 0) : ?>
-                <?php foreach($searchRes as $oneJob) : ?>
-                <li class="job-listing d-block d-sm-flex pb-3 pb-sm-0 align-items-center">
-                    <a href="<?php echo APPURL; ?>/jobs/job-single.php?id=<?php echo $oneJob->id; ?>"></a>
-                    <div class="job-listing-logo">
-                    <img src="users/user-images/<?php echo $oneJob->company_image; ?>" alt="Free Website Template by Free-Template.co" class="img-fluid">
-                    </div>
+  <div class="container">
+    <h2 class="section-title text-center">All Arts</h2>
+    <div class="row">
+        <?php foreach ($arts as $art): ?>
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <img src="./images/<?php echo htmlspecialchars($art['image']); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($art['title']); ?>">
+                <div class="card-body">
+                    <h5 class="card-title"><?php echo htmlspecialchars($art['title']); ?></h5>
+                    <p class="card-text"><?php echo htmlspecialchars(substr($art['description'], 0, 100)) . '...'; ?></p>
+                    <small class="text-muted">Posted by <?php echo htmlspecialchars($art['artist_name']); ?> on <?php echo date('F j, Y', strtotime($art['created_at'])); ?></small>
+                    <div class="mt-2">
+                        <a href="art_details.php?art_id=<?php echo $art['art_id']; ?>" class="btn btn-primary">View More</a>
 
-                    <div class="job-listing-about d-sm-flex custom-width w-100 justify-content-between mx-4">
-                    <div class="job-listing-position custom-width w-50 mb-3 mb-sm-0">
-                        <h2><?php echo $oneJob->job_title; ?></h2>
-                        <strong><?php echo $oneJob->company_name; ?></strong>
                     </div>
-                    <div class="job-listing-location mb-3 mb-sm-0 custom-width w-25">
-                        <span class="icon-room"></span> <?php echo $oneJob->job_region; ?>
-                    </div>
-                    <div class="job-listing-meta">
-                        <span class="badge badge-<?php if($oneJob->job_type == 'Part Time') { echo 'danger'; } else { echo 'success'; } ?>"><?php echo $oneJob->job_type; ?></span>
-                    </div>
-                    </div>
-                    
-                </li>
-                <br>
-                <?php endforeach; ?>
-            <?php else : ?>
-                 <div class="alert alert-danger bg-danger text-white">there are no searches with this job just yet</div>
-            <?php endif; ?>
-      </ul>
-   <div>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
 </section>
+
 <?php require "includes/footer.php"; ?>

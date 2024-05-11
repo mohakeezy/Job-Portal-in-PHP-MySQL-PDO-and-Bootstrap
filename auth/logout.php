@@ -4,6 +4,6 @@
     session_unset();
     session_destroy();
 
-    header("location: http://localhost/jobboard");
+    header("location: http://localhost/LAM");
 
 ?>
